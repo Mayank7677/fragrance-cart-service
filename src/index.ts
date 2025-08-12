@@ -7,6 +7,8 @@ import configureCors from "./configs/cors.config";
 import { errorHandler } from "./middlewares/errorHandler";
 import limiter from "./middlewares/rateLimit";
 
+import cartRouter from "./routes/cart.route";
+
 
 const app = express();
 
@@ -17,6 +19,7 @@ app.use(configureCors());
 app.use(limiter);
 
 // Routes
+app.use("/api/carts", cartRouter);
 
 // Global Error Handler
 app.use(errorHandler);
