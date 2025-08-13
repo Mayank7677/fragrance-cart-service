@@ -2,12 +2,12 @@ import { model, Schema } from "mongoose";
 import { ICartDocument, ICartItem } from "../schemas/cart.schema";
 
 const CartItemSchema = new Schema<ICartItem>({
-  product: {
+  productId: {
     type: Schema.Types.ObjectId,
     ref: "Product",
     required: true,
   },
-  variant: {
+  variantId: {
     type: Schema.Types.ObjectId,
     ref: "Variant",
   },
@@ -30,7 +30,7 @@ const CartItemSchema = new Schema<ICartItem>({
 
 const CartSchema = new Schema<ICartDocument>(
   {
-    user: {
+    userId: {
       type: Schema.Types.ObjectId,
       ref: "User",
       required: true,
@@ -46,7 +46,7 @@ const CartSchema = new Schema<ICartDocument>(
     },
     status: {
       type: String,
-      enum: ["active", "abandoned", "checked_out"],
+      enum: ["active", "abandoned", "checked-out"],
       default: "active",
     },
     isActive: {
