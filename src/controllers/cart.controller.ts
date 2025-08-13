@@ -4,6 +4,8 @@ import { catchAsync } from "../utils/catchAsync";
 import { AppError } from "../utils/appError";
 import { AuthenticatedRequest } from "../middlewares/admin.middleware";
 import axios from "axios";
+import { Types } from "mongoose";
+import { enrichCartData } from "../utils/cartHelper";
 
 export const addToCart = catchAsync(
   async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
@@ -81,10 +83,13 @@ export const addToCart = catchAsync(
 
     await cart.save();
 
+    // Use helper to get the full detailed cart response
+    const fullCartData = await enrichCartData(cart);
+
     res.status(200).json({
       status: "success",
       message: "Item added to cart successfully",
-      cart,
+      cart: fullCartData,
     });
   }
 );
@@ -192,6 +197,112 @@ export const getCartData = catchAsync(
         totalFinalPrice,
         grandTotal,
       },
+    });
+  }
+);
+
+export const removeCartItem = catchAsync(
+  async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    const userId = req.user?.userId;
+    const { itemId } = req.params;
+
+    // Validate ObjectId
+    if (!Types.ObjectId.isValid(itemId)) {
+      return res.status(400).json({ message: "Invalid item ID" });
+    }
+
+    // Find active cart for the user
+    const cart = await Cart.findOne({
+      userId,
+      status: "active",
+      isActive: true,
+    });
+
+    if (!cart) {
+      return next(new AppError("Cart not found", 404));
+    }
+
+    // Try to find the item in the cart
+    const itemIndex = cart.items.findIndex(
+      (item: any) => item._id && item._id.toString() === itemId
+    );
+    if (itemIndex === -1) {
+      return next(new AppError("Item not found", 404));
+    }
+
+    // Remove the item
+    cart.items.splice(itemIndex, 1);
+
+    // If cart is empty after removal, deactivate it
+    if (cart.items.length === 0) {
+      cart.isActive = false;
+      cart.status = "abandoned";
+    }
+
+    await cart.save();
+
+    // Use helper to get the full detailed cart response
+    const fullCartData = await enrichCartData(cart);
+
+    res.status(200).json({
+      message: "Item removed successfully",
+      cart: fullCartData,
+    });
+  }
+);
+
+export const updateCartItemQuantity = catchAsync(
+  async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    const userId = req.user?.userId;
+    const { itemId } = req.params;
+    const { quantity } = req.body;
+
+    if (!userId) {
+      return next(new AppError("User not found", 404));
+    }
+
+    // Validate ObjectId
+    if (!Types.ObjectId.isValid(itemId)) {
+      return res.status(400).json({ message: "Invalid item ID" });
+    }
+
+    // Validate quantity
+    if (typeof quantity !== "number" || quantity < 1) {
+      return res.status(400).json({ message: "Quantity must be at least 1" });
+    }
+
+    // Find active cart for the user
+    const cart = await Cart.findOne({
+      userId,
+      status: "active",
+      isActive: true,
+    });
+
+    if (!cart) {
+      return next(new AppError("Cart not found", 404));
+    }
+
+    // Find the item
+    const itemIndex = cart.items.findIndex(
+      (item: any) => item._id && item._id.toString() === itemId
+    );
+    if (itemIndex === -1) {
+      return next(new AppError("Item not found", 404));
+    }
+
+    // Update quantity & totalPrice
+    cart.items[itemIndex].quantity = quantity;
+    cart.items[itemIndex].totalPrice = quantity * cart.items[itemIndex].price;
+
+    await cart.save();
+
+    // Get updated cart with product details
+    const fullCartData = await enrichCartData(cart);
+
+    res.status(200).json({
+      status: "success",
+      message: "Cart item quantity updated successfully",
+      cart: fullCartData,
     });
   }
 );
